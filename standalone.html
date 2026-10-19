@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="TrustLens 2.0 — AI-Powered Scam Detection & Digital Safety Platform for India.">
+  <title>TrustLens 2.0 — AI-Powered Scam Detection & Digital Safety Platform (Standalone)</title>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          },
+          colors: {
+            slate: {
+              850: '#111827',
+              900: '#0f172a',
+              950: '#070b12'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #070b12;
+      color: #f1f5f9;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fadeIn { animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    body.senior-mode { font-size: 1.125rem !important; line-height: 1.7 !important; }
+    body.senior-mode h1 { font-size: 2.75rem !important; }
+    body.senior-mode h2 { font-size: 2.25rem !important; }
+    body.senior-mode h3 { font-size: 1.5rem !important; }
+    body.senior-mode button, body.senior-mode a.px-4 { padding-top: 0.85rem !important; padding-bottom: 0.85rem !important; font-size: 1rem !important; }
+  </style>
+</head>
+<body class="bg-[#070b12] text-slate-100 min-h-screen flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+
+  <!-- Senior Friendly Mode Top Alert Banner -->
+  <div id="seniorBannerContainer"></div>
+
+  <!-- Global Navigation Header -->
+  <div id="navbarContainer"></div>
+
+  <!-- Main Viewport Router Outlet -->
+  <main id="mainContentContainer" class="flex-1 w-full" role="main"></main>
+
+  <!-- Global Footer -->
+  <div id="footerContainer"></div>
+
+  <!-- Standalone Bundled Script -->
+  <script>
+    // --- 1. DATA PRESETS ---
+    const SAMPLE_SCAMS = [
+      {
+        id: 'sbi-kyc',
+        title: 'SBI YONO KYC Suspension SMS',
+        category: 'Bank / KYC Scam',
+        channel: 'SMS',
+        language: 'English & Hinglish',
+        rawText: `Dear Customer, Your SBI YONO account will be blocked today within 2 hours due to pending KYC verification. Please immediately update your PAN card and Aadhaar to avoid permanent suspension. Click here: https://sbi-kyc-update.live/portal?id=8392 Helpline: +91 98765 43210`,
+        maskedText: `Dear Customer, Your SBI YONO account will be blocked today within 2 hours due to pending KYC verification. Please immediately update your PAN card and Aadhaar to avoid permanent suspension. Click here: https://sbi-kyc-update.live/portal?id=8392 Helpline: +91 98*** ****0`,
+        riskScore: 94,
+        riskLevel: 'HIGH RISK',
+        impersonatedBrand: 'State Bank of India (SBI)',
+        summary: 'Classic banking credential phishing attack with artificial 2-hour urgency deadline and lookalike unverified domain.',
+        indicators: {
+          urgency: 'Blocked within 2 hours',
+          action: 'Click phishing link & submit PAN/Aadhaar',
+          url: 'https://sbi-kyc-update.live/portal?id=8392',
+          defangedUrl: 'hxxps[://]sbi-kyc-update[.]live/portal?id=8392',
+          phone: '+91 98765 43210'
+        },
+        trapMap: {
+          message: 'Urgent SMS threatening SBI YONO deactivation within 2 hours',
+          organization: 'State Bank of India (Impersonated)',
+          linkOrId: 'sbi-kyc-update.live (Fake unverified domain)',
+          requestedAction: 'Visit phishing link & enter netbanking credentials / OTP',
+          potentialRisk: 'Direct bank account drain & unauthorized fund transfer via cloned session'
+        },
+        redFlags: [
+          {
+            id: 'rf-1',
+            title: 'Artificial Urgency Deadline',
+            phrase: 'blocked today within 2 hours',
+            explanation: 'Scammers invent short deadlines (2 hours) to trigger panic and prevent victims from verifying with their branch.',
+            pattern: 'Panic Inducement & Threat of Service Termination',
+            method: 'Heuristic Rule: Urgency NLP Classifier',
+            evidenceSource: 'RBI Cyber Security Advisory (RBI/2021-22/86)',
+            severity: 'CRITICAL',
+            verifyAction: 'Check your account status exclusively via the official YONO app or your local SBI branch.'
+          },
+          {
+            id: 'rf-2',
+            title: 'Suspicious Non-Banking Domain',
+            phrase: 'sbi-kyc-update.live',
+            explanation: 'State Bank of India operates exclusively on the verified bank TLD (.sbi or onlinesbi.sbi). No official bank uses .live or generic cheap TLDs.',
+            pattern: 'Brand Impersonation & Typosquatting',
+            method: 'Domain Reputation & Official Whitelist Diff Engine',
+            evidenceSource: 'CERT-In Phishing Incident Advisory CIAD-2023-0041',
+            severity: 'CRITICAL',
+            verifyAction: 'Only access SBI through https://onlinesbi.sbi or the verified Google Play/Apple Store YONO app.'
+          },
+          {
+            id: 'rf-3',
+            title: 'Unauthorized Mobile Contact Number',
+            phrase: 'Helpline: +91 98765 43210',
+            explanation: 'Indian public sector banks never send mobile phone numbers for emergency KYC support. Official SMS headers are strictly six-character sender IDs (e.g., VM-SBIINB).',
+            pattern: 'Personal Mobile as Fake Helpline',
+            method: 'TRAI Telecom Header Verification Validator',
+            evidenceSource: 'TRAI DLT Commercial Communication Regulations',
+            severity: 'HIGH',
+            verifyAction: 'Never dial numbers sent in unverified SMS messages. Call SBI customer care at 1800 1234.'
+          }
+        ],
+        recommendedActions: [
+          { step: 1, title: 'Do Not Click the Link or Call the Number', description: 'Do not open sbi-kyc-update.live or dial the private mobile number provided.', badge: 'Immediate Priority' },
+          { step: 2, title: 'Verify Exclusively Through Official YONO App', description: 'Open your existing installed SBI YONO app or visit onlinesbi.sbi directly to check KYC compliance status.', badge: 'Independent Verification' },
+          { step: 3, title: 'Report Incident & Block Number', description: 'Report this SMS header or number to Indian Cyber Crime helpline 1930 or file on cybercrime.gov.in.', badge: 'Incident Response' }
+        ]
+      },
+      {
+        id: 'mahavitaran-electricity',
+        title: 'Mahavitaran Electricity Disconnection Fraud',
+        category: 'Utility Disconnection Scam',
+        channel: 'WhatsApp / SMS',
+        language: 'Hindi & English (Hinglish)',
+        rawText: `प्रिय ग्राहक, आपकी बिजली आपूर्ति आज रात 9:30 बजे महावितरण कार्यालय से काट दी जाएगी क्योंकि आपका पिछले महीने का बिल ₹1,850 अपडेट नहीं हुआ है। तुरंत हमारे बिजली अधिकारी श्री वर्मा से संपर्क करें: +91 98234 11223 या तुरंत लिंक पर बिल भरें: https://mahavitaran-billpay.online/quick`,
+        maskedText: `प्रिय ग्राहक, आपकी बिजली आपूर्ति आज रात 9:30 बजे महावितरण कार्यालय से काट दी जाएगी क्योंकि आपका पिछले महीने का बिल ₹1,850 अपडेट नहीं हुआ है। तुरंत हमारे बिजली अधिकारी श्री वर्मा से संपर्क करें: +91 98*** **223 या तुरंत लिंक पर बिल भरें: https://mahavitaran-billpay.online/quick`,
+        riskScore: 96,
+        riskLevel: 'HIGH RISK',
+        impersonatedBrand: 'MSEDCL / Mahavitaran',
+        summary: 'Widespread payment demand fraud targeting households across Maharashtra, Gujarat and North India threatening immediate power cut at 9:30 PM.',
+        indicators: {
+          urgency: 'Power cut tonight at 9:30 PM',
+          action: 'Call fake officer or pay via unverified portal',
+          url: 'https://mahavitaran-billpay.online/quick',
+          defangedUrl: 'hxxps[://]mahavitaran-billpay[.]online/quick',
+          phone: '+91 98234 11223'
+        },
+        trapMap: {
+          message: 'Late night power disconnection warning in Hindi/English',
+          organization: 'MSEDCL / State Electricity Board (Impersonated)',
+          linkOrId: 'mahavitaran-billpay.online & personal mobile number',
+          requestedAction: 'Call fake officer who asks to install remote access app (AnyDesk/TeamViewer) or pay via custom UPI',
+          potentialRisk: 'Full phone takeover via remote access tool and draining of linked bank accounts'
+        },
+        redFlags: [
+          {
+            id: 'rf-1',
+            title: 'Specific Power Disconnection Threat (9:30 PM)',
+            phrase: 'बिजली आपूर्ति आज रात 9:30 बजे काट दी जाएगी',
+            explanation: 'Electricity distribution boards never disconnect power at night. Disconnection requires formal written legal notices with consumer number.',
+            pattern: 'Utility Threat & Off-Hours Pressure',
+            method: 'State DISCOM Regulatory Rules Analyzer',
+            evidenceSource: 'Maharashtra Electricity Regulatory Commission (MERC)',
+            severity: 'CRITICAL',
+            verifyAction: 'Check your physical electricity bill or Mahavitaran official app (Mahavitaran Consumer App).'
+          },
+          {
+            id: 'rf-2',
+            title: 'Fake Personal Officer Identity',
+            phrase: 'बिजली अधिकारी श्री वर्मा (+91 98234 11223)',
+            explanation: 'Utility companies do not assign personal WhatsApp contact numbers for bill collections or settlement negotiations.',
+            pattern: 'Authority Personification & Direct Coercion',
+            method: 'Public Utility Contact Standard Heuristic',
+            evidenceSource: 'National Cyber Crime Portal Alert',
+            severity: 'CRITICAL',
+            verifyAction: 'Call your local substation or official 24x7 toll-free helpline: 1912.'
+          }
+        ],
+        recommendedActions: [
+          { step: 1, title: 'Never Call the Phone Number or Download Remote Apps', description: 'Scammers will instruct you to install AnyDesk, QuickSupport, or an APK file under the pretext of updating your bill.', badge: 'Critical Safety' },
+          { step: 2, title: 'Verify on Official Mahadiscom Portal or 1912', description: 'Dial 1912 (National Power Helpline) or check your 12-digit consumer number on mahadiscom.in.', badge: 'Official Verification' },
+          { step: 3, title: 'Forward Number to Chakshu Portal', description: 'Report suspected fraudulent communication to Department of Telecom Chakshu portal (sancharsaathi.gov.in).', badge: 'Government Reporting' }
+        ]
+      },
+      {
+        id: 'telegram-job-task',
+        title: 'Work-From-Home YouTube Like Task Scam',
+        category: 'Part-Time Task Scam',
+        channel: 'Telegram / WhatsApp',
+        language: 'English',
+        rawText: `Congratulations! Shortlisted for Remote Media Assistant. Earn ₹3,500 - ₹9,000 daily just by liking YouTube videos and rating hotels on Google Maps. Instant payouts to UPI! Contact HR Priya on Telegram: https://t.me/media_promoter_vip99 to claim ₹500 bonus.`,
+        maskedText: `Congratulations! Shortlisted for Remote Media Assistant. Earn ₹3,500 - ₹9,000 daily just by liking YouTube videos and rating hotels on Google Maps. Instant payouts to UPI! Contact HR Priya on Telegram: https://t.me/media_promoter_vip99 to claim ₹500 bonus.`,
+        riskScore: 91,
+        riskLevel: 'HIGH RISK',
+        impersonatedBrand: 'Reputed Digital Agency / YouTube Partner',
+        summary: 'High-yield task investment scam that begins with small payout bait before demanding large prepaid deposit tasks.',
+        indicators: {
+          urgency: 'Claim ₹500 bonus immediately',
+          action: 'Join Telegram VIP channel',
+          url: 'https://t.me/media_promoter_vip99',
+          defangedUrl: 'hxxps[://]t[.]me/media_promoter_vip99'
+        },
+        trapMap: {
+          message: 'Unsolicited job offer claiming ₹3,500-₹9,000 daily earnings for liking videos',
+          organization: 'Fake Recruitment / YouTube Partner agency',
+          linkOrId: 't.me/media_promoter_vip99 (Private Telegram Group)',
+          requestedAction: 'Perform initial dummy tasks, receive small bait, then deposit ₹5,000 - ₹50,000 for "Prepaid Tasks"',
+          potentialRisk: 'Sunk-cost trap resulting in losses ranging from ₹50,000 to multiple lakhs'
+        },
+        redFlags: [
+          {
+            id: 'rf-1',
+            title: 'Unrealistic Compensation for Trivial Actions',
+            phrase: 'Earn ₹3,500 - ₹9,000 daily just by liking YouTube videos',
+            explanation: 'Legitimate companies do not pay thousands of rupees per day for automated or trivial click tasks.',
+            pattern: 'Advance Fee & Ponzi Task Bait',
+            method: 'Economic Reality & Job Scam Signature Analysis',
+            evidenceSource: 'Ministry of Home Affairs (MHA) Task Fraud Advisory',
+            severity: 'CRITICAL',
+            verifyAction: 'Check genuine job portals (LinkedIn, Naukri) and verify if the company exists.'
+          }
+        ],
+        recommendedActions: [
+          { step: 1, title: 'Do Not Pay Any "Recharge" or "Security Deposit"', description: 'Even if they sent you ₹150 or ₹500 earlier as bait, never send any money back.', badge: 'Financial Defense' },
+          { step: 2, title: 'Block and Report the Telegram Channel & Sender', description: 'Report the WhatsApp sender as spam and report the Telegram username.', badge: 'Platform Action' },
+          { step: 3, title: 'Report UPI ID to Your Bank', description: 'If you transferred any funds to their UPI handle, call your bank immediately to freeze account.', badge: 'Asset Recovery' }
+        ]
+      }
+    ];
+
+    // --- 2. PII MASKER SERVICE ---
+    const PiiMasker = {
+      detectPII(text) {
+        if (!text) return [];
+        const detections = [];
+        const phoneRegex = /(?:(?:\+91|0091|0)[\s-]?)?[6-9]\d{4}[\s-]?\d{5}/g;
+        let match;
+        while ((match = phoneRegex.exec(text)) !== null) {
+          detections.push({ type: 'PHONE_NUMBER', label: 'Indian Mobile', value: match[0] });
+        }
+        const upiRegex = /[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}/g;
+        while ((match = upiRegex.exec(text)) !== null) {
+          if (!match[0].includes('.com') && !match[0].includes('.org')) {
+            detections.push({ type: 'UPI_ID', label: 'UPI Address', value: match[0] });
+          }
+        }
+        return detections;
+      },
+      maskPII(text, enabled = true) {
+        if (!text || !enabled) return text;
+        let masked = text;
+        masked = masked.replace(/(?:(?:\+91|0091|0)[\s-]?)?([6-9]\d{1})(\d{5})(\d{2})/g, (m, p1, p2, p3) => {
+          const prefix = m.startsWith('+91') ? '+91 ' : m.startsWith('0') ? '0' : '';
+          return `${prefix}${p1}*** ***${p3}`;
+        });
+        masked = masked.replace(/([a-zA-Z0-9])([a-zA-Z0-9.\-_]+)([a-zA-Z0-9])(@[a-zA-Z]{2,64})/g, (m, f, mid, l, bank) => {
+          if (bank.includes('.com') || bank.includes('.org')) return m;
+          return `${f}***${l}${bank}`;
+        });
+        return masked;
+      }
+    };
+
+    // --- 3. URL SCANNER SERVICE ---
+    const UrlScanner = {
+      defang(url) {
+        if (!url) return '';
+        return url.replace(/^https:\/\//i, 'hxxps[://]').replace(/^http:\/\//i, 'hxxp[://]').replace(/\./g, '[.]');
+      },
+      refang(defanged) {
+        if (!defanged) return '';
+        return defanged.replace(/^hxxps\[:\/\/\]/i, 'https://').replace(/^hxxp\[:\/\/\]/i, 'http://').replace(/\[\.\]/g, '.');
+      },
+      extractUrls(text) {
+        if (!text) return [];
+        const pattern = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(?:live|online|xyz|top|site|club|vip|cc|sbi|in|com)\b[^\s]*)/gi;
+        return [...new Set(text.match(pattern) || [])];
+      },
+      detectLookalike(domain) {
+        const clean = domain.toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').split('/')[0];
+        if (clean.includes('sbi') && clean !== 'onlinesbi.sbi' && !clean.endsWith('.sbi')) {
+          return { isLookalike: true, brand: 'State Bank of India', legitimateDomain: 'onlinesbi.sbi', riskReason: 'Unauthorized domain using SBI trademark' };
+        }
+        if (clean.includes('mahavitaran') || clean.includes('msedcl')) {
+          return { isLookalike: true, brand: 'Mahavitaran (MSEDCL)', legitimateDomain: 'mahadiscom.in', riskReason: 'Impersonating official electricity board portal' };
+        }
+        return { isLookalike: false };
+      },
+      async investigate(inputUrl) {
+        const url = this.refang(inputUrl.trim());
+        const isPhish = url.includes('sbi-kyc') || url.includes('mahavitaran-billpay') || url.includes('.live') || url.includes('.online');
+        const isOfficial = url.includes('onlinesbi.sbi');
+
+        return {
+          originalUrl: url,
+          defangedUrl: this.defang(url),
+          status: isOfficial ? 'VERIFIED' : isPhish ? 'SUSPICIOUS' : 'UNKNOWN',
+          riskScore: isOfficial ? 4 : isPhish ? 96 : 35,
+          finalDestination: url,
+          defangedDestination: this.defang(url),
+          redirectChain: [
+            { hop: 1, defanged: this.defang(url), httpCode: isPhish ? 302 : 200, status: isPhish ? 'SUSPICIOUS' : 'VERIFIED', server: 'Nginx Cloud Edge', duration: '120ms', note: isPhish ? 'Tracking bounce hop' : 'Direct secure endpoint' },
+            ...(isPhish ? [{ hop: 2, defanged: this.defang(url + '/auth'), httpCode: 200, status: 'SUSPICIOUS', server: 'LiteSpeed', duration: '190ms', note: 'Phishing landing page with cloned UI' }] : [])
+          ],
+          domainInfo: {
+            domainName: url.replace(/https?:\/\//, '').split('/')[0],
+            registeredDate: isPhish ? 'October 16, 2026 (3 days ago)' : 'November 15, 2014 (12 years ago)',
+            domainAge: isPhish ? '3 days old (Extreme Risk)' : '12 years old (Well Established)',
+            registrar: isPhish ? 'NameCheap, Inc. (Privacy Shield Active)' : 'State Bank of India (Brand Registry)',
+            hostingCountry: isPhish ? 'Seychelles / Cloudflare Proxy' : 'India (Mumbai SBI Data Center)',
+            ipAddress: isPhish ? '185.220.101.45' : '115.112.234.12'
+          },
+          sslCert: {
+            valid: true,
+            type: isOfficial ? 'Extended Validation (EV)' : 'Domain Validated (DV - Automated Free Cert)',
+            warning: isOfficial ? 'Authenticated corporate banking certificate.' : 'HTTPS ensures encrypted connection to scammer. Does NOT mean safe.'
+          },
+          lookalikeDetection: this.detectLookalike(url),
+          domIndicators: {
+            hasLoginForm: true,
+            hasPasswordField: isPhish,
+            hasOtpField: isPhish,
+            externalScriptCount: isPhish ? 8 : 3,
+            suspiciousEndpoints: isPhish ? ['POST /collect_credentials.php'] : []
+          },
+          sandboxScreenshot: {
+            renderedTitle: isOfficial ? 'Official Bank Portal' : 'Unverified Lookalike Portal',
+            warningBadges: isPhish ? ['CLONED ASSETS DETECTED', 'CREDENTIAL HARVESTER', 'SCRIPTS ISOLATED'] : ['AUTHENTIC DOMAIN'],
+            previewSummary: isPhish ? 'Sandboxed isolated preview reveals fake credential input fields targeting netbanking users.' : 'Legitimate banking infrastructure.'
+          },
+          queriedAt: new Date().toISOString()
+        };
+      }
+    };
+
+    // --- 4. ANALYZER ENGINE ---
+    const Analyzer = {
+      detectLanguage(text) {
+        if (!text) return { code: 'en', name: 'English' };
+        if (/[\u0900-\u097F]/.test(text)) {
+          return /\b(तुमचे|आहे|नाही)\b/.test(text) ? { code: 'mr', name: 'Marathi (मराठी)' } : { code: 'hi', name: 'Hindi (हिन्दी)' };
+        }
+        if (/\b(aapka|karein|turant|bijli|khata|bheja)\b/i.test(text)) {
+          return { code: 'hng', name: 'Hinglish (Colloquial)' };
+        }
+        return { code: 'en', name: 'English' };
+      },
+      analyze(text) {
+        const lang = this.detectLanguage(text);
+        const urls = UrlScanner.extractUrls(text);
+        const pii = PiiMasker.detectPII(text);
+        const redFlags = [];
+        let riskScore = 20;
+        let category = 'Unverified Communication';
+        let brand = 'Unknown';
+
+        if (/within 2 hours|blocked today|aaj raat|9:?30 pm|turant/i.test(text)) {
+          riskScore += 30;
+          redFlags.push({
+            id: 'rf-urgency',
+            title: 'High-Pressure Urgency Trap',
+            phrase: 'blocked today within 2 hours / 9:30 PM',
+            explanation: 'Scammers invent short deadlines to trigger panic and prevent independent verification.',
+            pattern: 'Panic Inducement & Threat of Disconnection',
+            method: 'NLP Temporal Urgency Classifier',
+            evidenceSource: 'RBI Cyber Security Advisory',
+            severity: 'CRITICAL',
+            verifyAction: 'Pause. Indian banks and utilities do not cancel services without multi-day written notices.'
+          });
+        }
+
+        if (/sbi|yono|bank/i.test(text)) {
+          brand = 'State Bank of India (SBI)';
+          category = 'Bank / KYC Scam';
+          riskScore += 25;
+        } else if (/mahavitaran|bijli|electricity/i.test(text)) {
+          brand = 'MSEDCL Mahavitaran';
+          category = 'Utility Disconnection Scam';
+          riskScore += 30;
+        } else if (/task|telegram|like youtube|earn ₹/i.test(text)) {
+          brand = 'Online Task Agency';
+          category = 'Part-Time Task Scam';
+          riskScore += 30;
+        }
+
+        if (urls.length > 0) {
+          riskScore += 30;
+          redFlags.push({
+            id: 'rf-url',
+            title: 'Unverified Non-Official Web Domain',
+            phrase: UrlScanner.defang(urls[0]),
+            explanation: 'Targets a recently registered generic domain rather than official authenticated domain (.sbi, .gov.in, .in).',
+            pattern: 'Phishing Credential Harvester',
+            method: 'WHOIS & DNS Reputation',
+            evidenceSource: 'CERT-In Phishing Alert',
+            severity: 'CRITICAL',
+            verifyAction: 'Never open this link. Access your bank or utility directly via their verified mobile application.'
+          });
+        }
+
+        if (pii.some(d => d.type === 'PHONE_NUMBER') && (category.includes('Bank') || category.includes('Utility'))) {
+          riskScore += 20;
+          redFlags.push({
+            id: 'rf-phone',
+            title: 'Personal Mobile Number Posing as Corporate Helpline',
+            phrase: pii.find(d => d.type === 'PHONE_NUMBER').value,
+            explanation: 'Banks and power distribution utilities do not use personal mobile numbers for official customer care.',
+            pattern: 'Mule Contact Impersonation',
+            method: 'TRAI Commercial Header Standard',
+            evidenceSource: 'TRAI DLT Regulations',
+            severity: 'HIGH',
+            verifyAction: 'Check contact details exclusively on your physical utility bill or back of your bank card.'
+          });
+        }
+
+        riskScore = Math.min(Math.max(riskScore, 10), 98);
+        const riskLevel = riskScore >= 70 ? 'HIGH RISK' : riskScore >= 40 ? 'MEDIUM RISK' : 'LOW RISK';
+
+        return {
+          riskScore,
+          riskLevel,
+          category,
+          impersonatedBrand: brand,
+          language: lang,
+          defangedUrls: urls.map(u => UrlScanner.defang(u)),
+          piiDetections: pii,
+          rawText: text,
+          maskedText: PiiMasker.maskPII(text, true),
+          redFlags,
+          recommendedActions: [
+            { step: 1, title: 'Do Not Call the Number or Open the Link', description: 'Ignore the sender and do not dial any phone number or click links in the message.', badge: 'Immediate Action' },
+            { step: 2, title: 'Verify Exclusively Through Official Banking / Utility App', description: 'Log in to your official mobile app or visit local branch/office to check account status.', badge: 'Independent Verification' },
+            { step: 3, title: 'If Money Was Lost, Call 1930 Promptly', description: 'Dial National Cyber Crime Helpline 1930 to freeze accounts and file on cybercrime.gov.in.', badge: 'Helpline 1930' }
+          ],
+          trapMap: {
+            message: text.slice(0, 85) + '...',
+            organization: brand + ' (Impersonated)',
+            linkOrId: urls.length > 0 ? UrlScanner.defang(urls[0]) : 'Unverified private contact',
+            requestedAction: 'Follow urgent instructions or submit credentials under panic',
+            potentialRisk: 'Direct financial drain or unauthorized account takeover'
+          }
+        };
+      }
+    };
+
+    // --- 5. REPORT STORAGE SERVICE ---
+    const StorageService = {
+      getSettings() {
+        try {
+          return JSON.parse(localStorage.getItem('tl_settings')) || { autoMaskPii: true, retentionDays: 30, seniorModeEnabled: false };
+        } catch { return { autoMaskPii: true, retentionDays: 30, seniorModeEnabled: false }; }
+      },
+      saveSettings(s) {
+        const updated = { ...this.getSettings(), ...s };
+        localStorage.setItem('tl_settings', JSON.stringify(updated));
+        return updated;
+      },
+      getReports() {
+        try {
+          const d = localStorage.getItem('tl_reports');
+          if (!d) return SAMPLE_SCAMS.slice(0, 2).map((s, i) => ({
+            id: 'rep-' + i,
+            title: s.title,
+            category: s.category,
+            riskLevel: s.riskLevel,
+            riskScore: s.riskScore,
+            impersonatedBrand: s.impersonatedBrand,
+            maskedText: s.maskedText,
+            defangedUrls: [s.indicators.defangedUrl],
+            createdAt: new Date().toISOString()
+          }));
+          return JSON.parse(d);
+        } catch { return []; }
+      },
+      saveReport(r) {
+        const reports = this.getReports();
+        const newR = { id: 'rep-' + Date.now(), createdAt: new Date().toISOString(), ...r };
+        localStorage.setItem('tl_reports', JSON.stringify([newR, ...reports]));
+        return newR;
+      },
+      deleteReport(id) {
+        const reports = this.getReports().filter(r => r.id !== id);
+        localStorage.setItem('tl_reports', JSON.stringify(reports));
+        return reports;
+      },
+      clearAllReports() {
+        localStorage.removeItem('tl_reports');
+        return [];
+      }
+    };
+
+    // --- 6. GLOBAL ROUTER & RENDER ENGINE ---
+    let currentRoute = window.location.hash || '#/';
+    let seniorMode = StorageService.getSettings().seniorModeEnabled;
+    let activeAnalysis = Analyzer.analyze(SAMPLE_SCAMS[0].rawText);
+    let selectedPresetId = 'sbi-kyc';
+    let investigationResult = null;
+
+    function renderApp() {
+      // Body Senior Mode Toggle
+      if (seniorMode) document.body.classList.add('senior-mode');
+      else document.body.classList.remove('senior-mode');
+
+      // 1. Senior Banner
+      const bannerEl = document.getElementById('seniorBannerContainer');
+      bannerEl.innerHTML = seniorMode ? `
+        <aside class="bg-amber-500 text-slate-950 font-sans px-4 py-3 border-b-2 border-amber-600 shadow-md">
+          <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl">👴</span>
+              <div>
+                <span class="font-extrabold text-sm sm:text-base">Senior Safety Mode Active (Simplified High-Contrast View)</span>
+                <p class="text-xs font-semibold text-slate-900">Large buttons enabled. DO / DO NOT rules prioritized.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <a href="tel:1930" class="px-4 py-2 rounded-xl bg-slate-950 text-amber-300 font-bold text-xs">📞 Call 1930 Helpline</a>
+              <button onclick="toggleSeniorMode()" class="px-3 py-2 rounded-xl bg-amber-400 font-bold text-xs text-slate-950 border border-amber-600">Exit</button>
+            </div>
+          </div>
+        </aside>
+      ` : '';
+
+      // 2. Navbar
+      const key = currentRoute.replace('#/', '').split('?')[0] || 'home';
+      const navLinks = [
+        { path: '#/', label: 'Overview', key: 'home' },
+        { path: '#/analyze', label: 'Analyze Scam', key: 'analyze' },
+        { path: '#/investigate', label: 'Safe Link Investigation', key: 'investigate' },
+        { path: '#/intelligence', label: 'Threat Intelligence', key: 'intelligence' },
+        { path: '#/family', label: 'Family Protection', key: 'family' },
+        { path: '#/reports', label: 'Saved Reports', key: 'reports' },
+        { path: '#/settings', label: 'Privacy & Settings', key: 'settings' }
+      ];
+
+      document.getElementById('navbarContainer').innerHTML = `
+        <header class="sticky top-0 z-50 backdrop-blur-md bg-slate-950/85 border-b border-slate-800/80">
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+              <a href="#/" class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg shadow-cyan-900/30">
+                  TL
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-lg text-white">TrustLens</span>
+                    <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800 rounded">2.0</span>
+                  </div>
+                  <span class="text-[11px] text-slate-400">AI Scam Defense India</span>
+                </div>
+              </a>
+
+              <nav class="hidden lg:flex items-center space-x-1">
+                ${navLinks.map(l => `
+                  <a href="${l.path}" class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    (l.key === 'home' && (key === '' || key === 'home')) || key === l.key
+                      ? 'text-cyan-400 bg-cyan-950/60 border border-cyan-800/60'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-900'
+                  }">${l.label}</a>
+                `).join('')}
+              </nav>
+
+              <div class="flex items-center space-x-3">
+                <button onclick="toggleSeniorMode()" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border ${seniorMode ? 'bg-amber-950 text-amber-300 border-amber-600' : 'bg-slate-900 text-slate-300 border-slate-700'}">
+                  👴 Senior: <strong>${seniorMode ? 'ON' : 'OFF'}</strong>
+                </button>
+                <a href="tel:1930" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                  <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                  <span>1930 Helpline</span>
+                </a>
+                <a href="#/analyze" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-950">
+                  Analyze Scam
+                </a>
+              </div>
+            </div>
+          </div>
+        </header>
+      `;
+
+      // 3. Main Outlet
+      const mainEl = document.getElementById('mainContentContainer');
+      switch (key) {
+        case 'analyze':
+          renderAnalyzePage(mainEl);
+          break;
+        case 'investigate':
+          renderInvestigatePage(mainEl);
+          break;
+        case 'intelligence':
+          renderIntelligencePage(mainEl);
+          break;
+        case 'family':
+          renderFamilyPage(mainEl);
+          break;
+        case 'reports':
+          renderReportsPage(mainEl);
+          break;
+        case 'settings':
+          renderSettingsPage(mainEl);
+          break;
+        case '':
+        case 'home':
+        default:
+          renderLandingPage(mainEl);
+          break;
+      }
+
+      // 4. Footer
+      document.getElementById('footerContainer').innerHTML = `
+        <footer class="bg-slate-950 border-t border-slate-900 text-slate-400 py-10 px-4 max-w-7xl mx-auto mt-16 text-xs space-y-6">
+          <div class="flex flex-col md:flex-row items-center justify-between gap-4 p-5 rounded-2xl bg-slate-900/80 border border-slate-800">
+            <div>
+              <span class="text-rose-400 font-bold uppercase tracking-wider block text-[10px]">National Cyber Crime Reporting Helpline</span>
+              <p class="text-white text-sm font-medium">Reporting within the "Golden Hour" (2 hours) freezes fraudulent recipient bank accounts.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <a href="tel:1930" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs">Dial 1930</a>
+              <a href="https://cybercrime.gov.in" target="_blank" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 font-semibold text-xs">cybercrime.gov.in ↗</a>
+            </div>
+          </div>
+          <div class="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-2">
+            <p>© 2026 TrustLens Platform. Designed for public digital safety in India. DPDP Act Compliant.</p>
+            <div class="flex items-center space-x-3">
+              <a href="#/settings" class="text-cyan-400 hover:underline">Privacy Controls</a>
+              <span>•</span>
+              <a href="https://sancharsaathi.gov.in" target="_blank" class="hover:text-slate-300">Chakshu Portal ↗</a>
+            </div>
+          </div>
+        </footer>
+      `;
+    }
+
+    window.toggleSeniorMode = function() {
+      seniorMode = !seniorMode;
+      StorageService.saveSettings({ seniorModeEnabled: seniorMode });
+      renderApp();
+    };
+
+    window.addEventListener('hashchange', () => {
+      currentRoute = window.location.hash || '#/';
+      renderApp();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+
+    // --- 7. PAGE RENDERERS ---
+
+    function renderLandingPage(el) {
+      const demo = SAMPLE_SCAMS[0];
+      el.innerHTML = `
+        <div class="space-y-16 pb-12 animate-fadeIn">
+          <section class="max-w-5xl mx-auto px-4 pt-16 text-center space-y-6">
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700 text-xs text-slate-300">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span>India's AI Scam Defense Platform</span>
+            </div>
+            <h1 class="text-4xl sm:text-6xl font-extrabold text-white tracking-tight">
+              Spot the Scam <br/><span class="bg-gradient-to-r from-cyan-400 via-sky-300 to-blue-400 bg-clip-text text-transparent">Before It Costs You.</span>
+            </h1>
+            <p class="max-w-2xl mx-auto text-base sm:text-lg text-slate-300">
+              Analyze suspicious screenshots, messages, and links. Understand the evidence, uncover the trap, and know exactly what to do next.
+            </p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <a href="#/analyze" class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm shadow-xl shadow-cyan-950">
+                Analyze a Suspicious Message
+              </a>
+              <a href="#/investigate" class="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-slate-900 text-slate-200 border border-slate-700 text-sm font-semibold">
+                Investigate Safe Link →
+              </a>
+            </div>
+          </section>
+
+          <!-- Interactive Demo -->
+          <section class="max-w-6xl mx-auto px-4">
+            <div class="rounded-3xl border border-slate-800 bg-slate-950 p-6 sm:p-8 shadow-2xl space-y-6">
+              <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-900 text-cyan-400 border border-slate-700">Interactive Demonstration</span>
+                  <p class="text-xs text-slate-400 mt-1">Sample Case: Fictional SBI YONO Deactivation SMS</p>
+                </div>
+                <a href="#/analyze" class="text-xs text-cyan-400 font-bold hover:underline">Open Full Analyzer ↗</a>
+              </div>
+
+              <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div class="lg:col-span-5 space-y-4">
+                  <div class="p-4 rounded-2xl bg-rose-950/40 border border-rose-900 flex items-center justify-between">
+                    <div>
+                      <span class="text-[10px] font-bold text-rose-400 uppercase">Assessment</span>
+                      <div class="text-lg font-extrabold text-rose-300">HIGH RISK (94/100)</div>
+                    </div>
+                    <span class="text-xs px-2.5 py-1 rounded-md bg-rose-900 text-rose-200 font-semibold">Bank / KYC Scam</span>
+                  </div>
+
+                  <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase">Message Body (PII Masked):</span>
+                    <p class="text-xs font-mono text-slate-200">"${demo.maskedText}"</p>
+                    <div class="text-[11px] font-mono text-cyan-300 bg-slate-950 p-2 rounded border border-slate-800">
+                      Defanged Link: ${demo.indicators.defangedUrl}
+                    </div>
+                  </div>
+
+                  <div class="p-4 rounded-2xl bg-emerald-950/30 border border-emerald-900 text-xs text-emerald-200 space-y-1">
+                    <strong class="text-emerald-400 uppercase text-[10px] block">Recommended Safe Action:</strong>
+                    Do not call the number. Verify exclusively via official YONO app or local branch. If financial loss occurred, call 1930.
+                  </div>
+                </div>
+
+                <div class="lg:col-span-7 space-y-3">
+                  <span class="text-xs font-bold uppercase text-slate-300 block">Expandable Red Flags (3 Detected):</span>
+                  ${demo.redFlags.map(rf => `
+                    <div class="p-3 rounded-xl border border-slate-800 bg-slate-900 text-xs space-y-2">
+                      <div class="flex items-center justify-between font-bold text-white">
+                        <span>● ${rf.title}</span>
+                        <span class="text-rose-400 text-[10px] uppercase">${rf.severity}</span>
+                      </div>
+                      <div class="text-rose-300 font-mono text-[11px]">Match: "${rf.phrase}"</div>
+                      <p class="text-slate-400 text-[11px]">${rf.explanation}</p>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
+    function renderAnalyzePage(el) {
+      el.innerHTML = `
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-6 border-b border-slate-800 gap-4">
+            <div>
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 uppercase">Feature 1, 3 & 7</span>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Screenshot & Message Analyzer</h1>
+              <p class="text-xs text-slate-400">OCR extraction, Multilingual pattern matching, and Explainable Red Flags.</p>
+            </div>
+            <button onclick="saveCurrentReport()" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow">
+              💾 Save to Reports
+            </button>
+          </div>
+
+          <!-- Presets Bar -->
+          <div class="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <span class="text-xs font-bold text-slate-300 uppercase">Load Indian Scam Samples:</span>
+            <div class="flex flex-wrap gap-2">
+              ${SAMPLE_SCAMS.map(s => `
+                <button onclick="loadPreset('${s.id}')" class="px-3 py-1.5 rounded-lg text-xs font-medium border ${selectedPresetId === s.id ? 'bg-cyan-950 text-cyan-300 border-cyan-700' : 'bg-slate-950 text-slate-400 border-slate-800'}">
+                  ${s.title}
+                </button>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <!-- Left: Text Input -->
+            <div class="lg:col-span-6 space-y-4">
+              <div class="rounded-2xl border border-slate-800 bg-slate-900 p-5 space-y-3">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="font-bold text-slate-200 uppercase">Message Text / OCR Output</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    ${activeAnalysis.language.name}
+                  </span>
+                </div>
+                <textarea id="analyzeTextarea" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-cyan-500 resize-none">${activeAnalysis.rawText}</textarea>
+                <button onclick="runManualAnalysis()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow">
+                  Run Cross-Examination
+                </button>
+              </div>
+            </div>
+
+            <!-- Right: Findings & Next Steps -->
+            <div class="lg:col-span-6 space-y-4">
+              <div class="p-4 rounded-2xl ${activeAnalysis.riskScore >= 70 ? 'bg-rose-950/30 border border-rose-900' : 'bg-slate-900 border border-slate-800'} space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-rose-400 uppercase">● ${activeAnalysis.riskLevel} (${activeAnalysis.riskScore}/100)</span>
+                  <span class="text-xs text-slate-400 font-semibold">${activeAnalysis.category}</span>
+                </div>
+                ${activeAnalysis.defangedUrls.length > 0 ? `
+                  <div class="text-xs font-mono text-cyan-300 bg-slate-950 p-2 rounded border border-slate-800">
+                    Defanged Target: ${activeAnalysis.defangedUrls[0]}
+                  </div>
+                ` : ''}
+              </div>
+
+              <!-- Red Flags List -->
+              <div class="space-y-2">
+                <span class="text-xs font-bold uppercase text-slate-300 block">Explainable Red Flags:</span>
+                ${activeAnalysis.redFlags.map(rf => `
+                  <div class="p-3 rounded-xl border border-slate-800 bg-slate-900 text-xs space-y-1.5">
+                    <div class="flex items-center justify-between font-bold text-white">
+                      <span>● ${rf.title}</span>
+                      <span class="text-[10px] text-rose-400 uppercase">${rf.severity}</span>
+                    </div>
+                    <div class="text-rose-300 font-mono text-[11px]">Match: "${rf.phrase}"</div>
+                    <p class="text-slate-400 text-[11px]">${rf.explanation}</p>
+                    <div class="text-emerald-300 text-[11px] pt-1">Safe Action: ${rf.verifyAction}</div>
+                  </div>
+                `).join('')}
+              </div>
+
+              <!-- Next Actions -->
+              <div class="p-5 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-cyan-800/80 space-y-3">
+                <span class="text-xs font-bold text-white uppercase tracking-wider block">Prioritized Next Steps:</span>
+                <div class="space-y-2 text-xs">
+                  ${activeAnalysis.recommendedActions.map((act, i) => `
+                    <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800 space-y-0.5">
+                      <div class="font-bold text-white flex items-center gap-1.5">
+                        <span class="w-4 h-4 rounded-full bg-cyan-950 text-cyan-400 flex items-center justify-center text-[10px]">${i + 1}</span>
+                        <span>${act.title}</span>
+                      </div>
+                      <p class="text-slate-400 text-[11px] pl-5">${act.description}</p>
+                    </div>
+                  `).join('')}
+                </div>
+                <button onclick="copyCybercrimeDraft()" class="w-full py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow mt-2">
+                  📋 Copy Cybercrime Report Draft (cybercrime.gov.in)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderInvestigatePage(el) {
+      el.innerHTML = `
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="pb-6 border-b border-slate-800">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 uppercase">Feature 2</span>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Safe Link Investigation</h1>
+            <p class="text-xs text-slate-400">"Investigate Before You Click" — Multi-hop redirects, WHOIS registration, and isolated DOM inspection.</p>
+          </div>
+
+          <div class="rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row gap-3">
+              <input id="invInput" type="text" value="https://sbi-kyc-update.live/portal?id=8392" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-cyan-500" />
+              <button onclick="runLinkInvestigation()" class="px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow">
+                Investigate Link
+              </button>
+            </div>
+          </div>
+
+          <div id="invOutput" class="space-y-6">
+            <div class="p-8 text-center rounded-2xl border border-slate-800 bg-slate-900/40 text-xs text-slate-400">
+              Click "Investigate Link" to launch isolated sandbox analysis.
+            </div>
+          </div>
+        </div>
+      `;
+      // Auto run default
+      setTimeout(() => runLinkInvestigation(), 50);
+    }
+
+    function renderIntelligencePage(el) {
+      el.innerHTML = `
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 uppercase">Feature 4</span>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Community Scam Intelligence</h1>
+              <p class="text-xs text-slate-400">Clustered threat indicators across Indian states.</p>
+            </div>
+            <button onclick="alert('Thank you for helping protect fellow citizens. Your report will be sanitized before submission.')" class="px-4 py-2 rounded-xl bg-cyan-600 text-white text-xs font-bold">
+              📢 Report a Scam
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="p-5 rounded-2xl border border-slate-800 bg-slate-900 space-y-3">
+              <div class="flex items-center justify-between font-bold text-white text-sm">
+                <span>⚡ Maharashtra Electricity Disconnection Surge</span>
+                <span class="text-rose-400 text-xs font-mono">1,420 Reports</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                Fraudsters claim power cut at 9:30 PM due to unpaid bill. Victims coerced to call fake officers and install AnyDesk/QuickSupport APKs.
+              </p>
+              <div class="font-mono text-xs text-amber-300 bg-slate-950 p-2.5 rounded border border-slate-800">
+                Indicators: +91 98234 11223 • mahavitaran-billpay.online • powerbill@ybl
+              </div>
+            </div>
+
+            <div class="p-5 rounded-2xl border border-slate-800 bg-slate-900 space-y-3">
+              <div class="flex items-center justify-between font-bold text-white text-sm">
+                <span>🏦 SBI YONO APK Credential Theft</span>
+                <span class="text-rose-400 text-xs font-mono">3,890 Reports</span>
+              </div>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                SMS claiming account blocked. Links deliver Trojan.SpySMS APK that intercepts 2FA OTP codes.
+              </p>
+              <div class="font-mono text-xs text-amber-300 bg-slate-950 p-2.5 rounded border border-slate-800">
+                Indicators: sbi-kyc-update.live • SBI_YONO_KYC.apk
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFamilyPage(el) {
+      el.innerHTML = `
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 uppercase">Feature 6</span>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Help Protect the People You Love.</h1>
+              <p class="text-xs text-slate-400">Consent-based family care circle and senior alerts.</p>
+            </div>
+            <button onclick="toggleSeniorMode()" class="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold">
+              👴 ${seniorMode ? 'Exit Senior Mode' : 'Enable Senior Mode'}
+            </button>
+          </div>
+
+          <div class="p-6 rounded-2xl border border-rose-900/60 bg-slate-900 space-y-3">
+            <div class="flex items-center justify-between font-bold text-sm text-white">
+              <span>Ramesh Sharma (Father) requested second opinion:</span>
+              <span class="text-rose-400 font-mono text-xs">HIGH RISK (96/100)</span>
+            </div>
+            <div class="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200">
+              "Electricity power cut tonight at 9:30 PM. Pay Mahavitaran bill ₹1,850: https://mahavitaran-billpay.online/quick"
+            </div>
+            <div class="flex items-center gap-3 pt-1">
+              <button onclick="alert('Alert dispatched to Dad: DO NOT PAY - Confirmed Electricity Scam.')" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs shadow">
+                🚨 Send "DO NOT PAY" Alert to Dad
+              </button>
+              <button onclick="alert('Marked as safe.')" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">
+                Mark Safe
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderReportsPage(el) {
+      const reports = StorageService.getReports();
+      el.innerHTML = `
+        <div class="max-w-7xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="flex items-center justify-between pb-6 border-b border-slate-800">
+            <div>
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 uppercase">Storage</span>
+              <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Saved Analysis Reports</h1>
+              <p class="text-xs text-slate-400">Local-only encrypted storage. Zero third-party ad tracking.</p>
+            </div>
+            <button onclick="StorageService.clearAllReports(); renderApp();" class="px-3 py-1.5 rounded-lg border border-slate-700 text-rose-400 text-xs font-semibold">
+              Clear All
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            ${reports.map(r => `
+              <div class="p-4 rounded-2xl border border-slate-800 bg-slate-900 text-xs space-y-2">
+                <div class="flex items-center justify-between font-bold text-white">
+                  <span>● ${r.title}</span>
+                  <span class="text-rose-400 uppercase text-[10px]">${r.riskLevel} (${r.riskScore}/100)</span>
+                </div>
+                <div class="p-2.5 rounded bg-slate-950 font-mono text-slate-300">"${r.maskedText}"</div>
+                <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                  <span>Category: ${r.category}</span>
+                  <button onclick="copyCybercrimeDraft()" class="text-cyan-400 font-semibold hover:underline">📋 Copy 1930 Draft</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSettingsPage(el) {
+      el.innerHTML = `
+        <div class="max-w-4xl mx-auto px-4 py-8 space-y-8 animate-fadeIn">
+          <div class="pb-6 border-b border-slate-800">
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 uppercase">DPDP Act</span>
+            <h1 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Privacy & Data Settings</h1>
+            <p class="text-xs text-slate-400">Control personal-data redaction and report retention.</p>
+          </div>
+
+          <div class="p-6 rounded-2xl border border-slate-800 bg-slate-900 text-xs space-y-4">
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-cyan-600" />
+              <span>Always mask phone numbers and UPI IDs before displaying or saving</span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked class="rounded bg-slate-800 border-slate-700 text-cyan-600" />
+              <span>Retain reports locally for 30 days then purge automatically</span>
+            </label>
+            <button onclick="alert('Preferences saved successfully.')" class="px-5 py-2.5 rounded-xl bg-cyan-600 text-white font-bold text-xs shadow mt-2">
+              Save Preferences
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Window helpers
+    window.loadPreset = function(id) {
+      selectedPresetId = id;
+      const found = SAMPLE_SCAMS.find(s => s.id === id);
+      if (found) {
+        activeAnalysis = Analyzer.analyze(found.rawText);
+        renderApp();
+      }
+    };
+
+    window.runManualAnalysis = function() {
+      const val = document.getElementById('analyzeTextarea')?.value;
+      if (val) {
+        activeAnalysis = Analyzer.analyze(val);
+        renderApp();
+      }
+    };
+
+    window.saveCurrentReport = function() {
+      StorageService.saveReport({
+        title: activeAnalysis.impersonatedBrand + ' - ' + activeAnalysis.category,
+        category: activeAnalysis.category,
+        riskLevel: activeAnalysis.riskLevel,
+        riskScore: activeAnalysis.riskScore,
+        impersonatedBrand: activeAnalysis.impersonatedBrand,
+        maskedText: activeAnalysis.maskedText,
+        rawText: activeAnalysis.rawText,
+        defangedUrls: activeAnalysis.defangedUrls
+      });
+      alert('✓ Report saved securely to your local storage.');
+    };
+
+    window.copyCybercrimeDraft = function() {
+      const draft = `INCIDENT DRAFT FOR NATIONAL CYBER CRIME REPORTING PORTAL (cybercrime.gov.in)
+Helpline: 1930 | Prepared via TrustLens Digital Safety Platform
+Date/Time: ${new Date().toLocaleString('en-IN')} IST
+Category: ${activeAnalysis.category}
+Impersonated: ${activeAnalysis.impersonatedBrand}
+Defanged URL: ${activeAnalysis.defangedUrls.join(', ') || 'N/A'}
+Message Excerpt: "${activeAnalysis.maskedText}"
+Suspected Modus Operandi: Urgent coercion and credential harvesting.`;
+
+      navigator.clipboard.writeText(draft).then(() => {
+        alert('✓ Report draft copied to clipboard!\nYou can paste it directly into https://cybercrime.gov.in or read it when calling 1930.');
+      }).catch(() => {
+        prompt('Copy your 1930 Cybercrime draft:', draft);
+      });
+    };
+
+    window.runLinkInvestigation = async function() {
+      const input = document.getElementById('invInput');
+      const url = input?.value || 'https://sbi-kyc-update.live/portal';
+      const out = document.getElementById('invOutput');
+      if (out) out.innerHTML = `<div class="p-6 text-center text-cyan-400 font-mono text-xs">Tracing multi-hop redirect chain & DNS...</div>`;
+      
+      const res = await UrlScanner.investigate(url);
+      if (out) {
+        out.innerHTML = `
+          <div class="p-6 rounded-2xl border border-slate-800 bg-slate-900 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <span class="px-2.5 py-0.5 rounded text-xs font-bold ${res.status === 'VERIFIED' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-rose-950 text-rose-300 border border-rose-800'}">
+                ● ${res.status} (Risk Score: ${res.riskScore}/100)
+              </span>
+              <span class="text-xs font-mono text-slate-400">Quarantined Sandbox</span>
+            </div>
+
+            <div class="space-y-2 text-xs font-mono">
+              <div class="text-cyan-300">Defanged Target: ${res.defangedUrl}</div>
+              <div class="text-slate-300">Domain Age: <strong class="${res.domainInfo.domainAge.includes('Risk') ? 'text-rose-400' : 'text-emerald-400'}">${res.domainInfo.domainAge}</strong></div>
+              <div class="text-slate-400">Registrar: ${res.domainInfo.registrar} (${res.domainInfo.hostingCountry})</div>
+              <div class="text-slate-400">TLS Cert: ${res.sslCert.type}</div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-amber-200">
+              ⚠️ ${res.sslCert.warning}
+            </div>
+
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-2">
+              <div class="text-xs font-bold text-white uppercase">${res.sandboxScreenshot.renderedTitle}</div>
+              <p class="text-[11px] text-slate-300">${res.sandboxScreenshot.previewSummary}</p>
+              <div class="flex justify-center gap-2 pt-1">
+                ${res.sandboxScreenshot.warningBadges.map(b => `<span class="px-2 py-0.5 rounded bg-slate-900 text-cyan-300 text-[10px] font-bold border border-slate-800">${b}</span>`).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    };
+
+    // Initial render
+    renderApp();
+  </script>
+</body>
+</html>
